@@ -1,7 +1,7 @@
 ---------------------------
 Intro
 ---------------------------
-These demos represent example framebuffer/DCU applications for the Freescale SAC58R EVB customer platform.
+These demos represent example framebuffer/DCU applications for the Freescale platforms.
 
 ---------------------------
 Description of the demos
