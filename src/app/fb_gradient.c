@@ -37,7 +37,7 @@ int main(int argc, char** argv)
 	int fb_bpp = 32;
 
 	/* setup all active FB layers */
-	ret = setup_fb_layers(FB_NUM_LAYERS, fb_resx, fb_resy, fb_bpp);
+	ret = setup_fb_layers(FB_NUM_LAYERS, fb_resx, fb_resy, fb_bpp, 0);
 	DIE(ret != 0, "could not setup fb layers");
 
 	sq_x = 50;

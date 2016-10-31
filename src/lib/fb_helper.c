@@ -1,5 +1,5 @@
 /*********************************************************************
-* Copyright (C) 2014 by Freescale, Inc.
+* Copyright (C) 2014-2016 by Freescale, Inc.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -30,22 +30,36 @@ const char *dcu_name[DCU_NUM] =
 	"/dev/dcu0"
 };
 
+/* IOCTL API used by Vivante GPU drivers */
+#define MXCFB_SET_PREFETCH	_IOW('F', 0x30, int)
+#define MXCFB_GET_PREFETCH	_IOR('F', 0x31, int)
+
+/*  from v4l headers */
+#define v4l2_fourcc(a, b, c, d)\
+	((__u32)(a) | ((__u32)(b) << 8) | ((__u32)(c) << 16) | ((__u32)(d) << 24))
+
+/* 32bit single buf 4x4 standard */
+#define IPU_PIX_FMT_GPU32_ST     v4l2_fourcc('5', 'I', '4', 'S')
+
 char *fb_ptr[FB_NUM_LAYERS];
 int fb_fd[FB_NUM_LAYERS];
 int dcu_fd[DCU_NUM];
 int fb_screensize[FB_NUM_LAYERS];
 
-/* crea single buffer per layer and clear all layers */
+/* create single buffer per layer and clear all layers */
 int setup_fb_layers(int num_fb_active,
 		int fb_resx,
 		int fb_resy,
-		int fb_bpp)
+		int fb_bpp,
+		int fb_tiled
+		)
 {
 	struct IOCTL_LAYER_POS layer_cfg;
 	struct IOCTL_LAYER_CHROMA layer_chroma_keys;
 	struct IOCTL_LAYER_ALFA_KEY layer_alfa_key;
 
 	int i, j, ret;
+	int enabled = 0;
 	struct fb_var_screeninfo fb_var_info[FB_NUM_LAYERS];
 	struct fb_fix_screeninfo fb_fix_info[FB_NUM_LAYERS];
 
@@ -68,12 +82,25 @@ int setup_fb_layers(int num_fb_active,
 		fb_var_info[i].xres = fb_resx;
 		fb_var_info[i].yres = fb_resy;
 		fb_var_info[i].bits_per_pixel = fb_bpp;
+		fb_var_info[i].nonstd = fb_tiled ? IPU_PIX_FMT_GPU32_ST : 0;
 		ret = ioctl(fb_fd[i], FBIOPUT_VSCREENINFO, &fb_var_info[i]);
 		DIE(ret == (-1), "Error writing fixed information /dev/fb");
 
 		/* Get fixed screen information */
 		ret = ioctl(fb_fd[i], FBIOGET_FSCREENINFO, &fb_fix_info[i]);
 		DIE(ret == (-1), "Error reading fixed information /dev/fb");
+
+		ret = ioctl(fb_fd[i], MXCFB_GET_PREFETCH, &enabled);
+		if (!ret)
+			printf("Current tile status is %d\n", enabled);
+		else
+			printf("MXCFB_GET_PREFETCH not implemented\n");
+
+		ret = ioctl(fb_fd[i], MXCFB_SET_PREFETCH, &fb_tiled);
+		if (ret != 0) {
+			printf("Error setting tile mode %s\n", fb_tiled == 0 ? "liniar" : "tiled");
+			printf("MXCFB_SET_PREFETCH not implemented\n");
+		}
 
 		if((fb_var_info[i].xres != fb_resx) ||
 			(fb_var_info[i].yres != fb_resy) ||
@@ -117,4 +144,5 @@ int clean_fb_layers(int num_fb_active)
 		close(fb_fd[i]);
 		close(dcu_fd[0]);
 	}
+	return 0;
 }

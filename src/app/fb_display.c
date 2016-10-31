@@ -125,7 +125,7 @@ int main(int argc, char** argv)
 		printf("DCU0 IOCTL_SET_DISPLAY_CFG failed: %s\n", strerror(errno));
 		
 	/* setup all active FB layers */
-	ret = setup_fb_layers(FB_NUM_LAYERS, fb_resx, fb_resy, fb_bpp);
+	ret = setup_fb_layers(FB_NUM_LAYERS, fb_resx, fb_resy, fb_bpp, 0);
 	DIE(ret != 0, "could not setup fb layers");
 	
 	/* DRAW chess board */

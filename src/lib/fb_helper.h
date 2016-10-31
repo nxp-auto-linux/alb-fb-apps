@@ -66,7 +66,8 @@ extern int fb_screensize[FB_NUM_LAYERS];
 int setup_fb_layers(int num_fb_active,
 		int fb_resx,
 		int fb_resy,
-		int fb_bpp);
+		int fb_bpp,
+		int fb_tiled);
 
 int setup_fb_layers_db(int num_fb_active,
 		int fb_resx,
