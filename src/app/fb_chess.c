@@ -60,7 +60,6 @@ int open_bmp_file(const char* path, struct bmp* handle)
 
 	DIE((handle->width > FB_RESX) || (handle->height > FB_RESY),
 			"BMP resolution is larger then supported layer size");
-	DIE(handle->bpp != 32 ,"Only 32bpp BMP is supported");
 
 	handle->filemmp = mmap(0, handle->width * handle->height * handle->bpp/8 + data_offset,
 		PROT_READ , MAP_SHARED, handle->ifd, 0);
@@ -97,7 +96,7 @@ int main(int argc, char** argv)
 	int offset = 0;
 
 	/* input file descriptor */
-	struct bmp bmpHandle;
+	struct bmp bmpHandle = {0};
 
 	/*  output file descriptor */
 	char* ofmem = NULL;
@@ -114,15 +113,15 @@ int main(int argc, char** argv)
 	int argIndx = 1;
 
 	if((argc < 2) || (argc > 4)){
-		printf("FB CHESS");
-		printf("Test FB/DCU display interface by drawing a chess-board on specified layer.\n");
+		printf("FB CHESS\n");
+		printf("Test FB/DCU display interface by drawing a chess-board/input image on specified layer.\n");
 		printf("./fb_chess nlayer bpp [tiled] [if={file}] [of={file}] \n");
-		printf("Where:\n\tbpp=24/32 - pixel format\n");
+		printf("Where:\n\tbpp=24/32 - DCU pixel format\n");
 		printf("\ttiled - if specified then DCU layer will be changed to expect image in GPU tiled format\n");
-		printf("\tif={file} - path to a bitmap file with resolution 1920x1080\n");
+		printf("\tif={file} - path to a bitmap file with bpp format matching DCU format\n");
 		printf("EXAMPLES:\n");
-		printf("./fb_chess 0 bpp if={file}\n");
-		printf("./fb_chess 0 bpp tiled if={file}\n");
+		printf("./fb_chess 0 24 if={file}\n");
+		printf("./fb_chess 0 32 tiled if={file}\n");
 	}
 
 	if(argc > argIndx ) {
@@ -157,6 +156,9 @@ int main(int argc, char** argv)
 			char* fpath=val+3;
 			argIndx++;
 			open_bmp_file(fpath, &bmpHandle);
+			if (bmpHandle.bpp != 32 && bmpHandle.bpp != 24) {
+				DIE(bmpHandle.bpp != 32 && bmpHandle.bpp != 24, "Only 24bpp or 32bpp BMP format is supported");
+			}
 		}
 	}
 	if(argc > argIndx) {
@@ -171,8 +173,13 @@ int main(int argc, char** argv)
 		}
 	}
 
-	printf("Draw chess-board with resolution %dx%d with %d bpp on layer %d and tile size %d\n",
-			fb_resx, fb_resy, fb_bpp, layerToDraw, tileSize);
+	printf("Draw %s on DCU layer %d configured with size %dx%d and %d bpp and tile size %d:%d\n",
+			((bmpHandle.ifmem == NULL) ? "chess-board" : "file"),
+			layerToDraw, fb_resx, fb_resy, fb_bpp,  tileSize, tileSize);
+	if (bmpHandle.ifmem != NULL) {
+		printf("Input file configuration:\n\tbpp=%d\n\tx_res=%d\n\ty_res=%d\n",
+				bmpHandle.bpp, bmpHandle.width, bmpHandle.height);
+	}
 
 	/* setup all active FB layers */
 	ret = setup_fb_layers(layerToDraw+1, fb_resx, fb_resy, fb_bpp, tileSize > 1 ? 1 : 0);
@@ -214,16 +221,23 @@ int main(int argc, char** argv)
 				/*
 				 Image copy:
 				 input file is linear, regardless of output tiled format
-				 */
 
-				int ifbppOffset = (y * bmpHandle.width + x) * fb_bpp/8;
+				 In case input file has alpha byte and fb is configured without, then just ignore it
+				 */
+				char file_pixel_alpha=0;
+
+				int ifbppOffset = (y * bmpHandle.width + x) * bmpHandle.bpp/8;
 
 				/* if coordinate outside of input file skip drawing it */
 				if (y > bmpHandle.height || x > bmpHandle.width)
 					continue;
 
+				if (bmpHandle.bpp == 32) {
+					file_pixel_alpha = *(bmpHandle.ifmem + ifbppOffset++);
+				}
+
 				if (fb_bpp == 32) {
-					*(output + offset + bppOffset++) = *(bmpHandle.ifmem + ifbppOffset++);
+					*(output + offset + bppOffset++) = file_pixel_alpha;
 				}
 				*(output + offset + bppOffset++) = *(bmpHandle.ifmem + ifbppOffset++);
 				*(output + offset + bppOffset++) = *(bmpHandle.ifmem + ifbppOffset++);
